@@ -1,0 +1,56 @@
+DESPLIEGUE
+==========
+
+1. Desplegar normalmente como un proyecto en Laravel.
+2. Crear base de datos MySQL:
+
+CREATE DATABASE `pulpomatic`;
+GRANT ALL PRIVILEGES ON pulpomatic.* TO pulpomatic@localhost IDENTIFIED BY 'pulp0m4t1c';
+USE pulpomatic;
+
+CREATE TABLE `simulaciones` (
+`sess` varchar(32) NOT NULL,
+`noAutos` int(11) NOT NULL DEFAULT '5',
+`noClientes` int(11) NOT NULL DEFAULT '5',
+`lat` decimal(10,7) NOT NULL DEFAULT '20.9870000',
+`lon` decimal(10,7) NOT NULL DEFAULT '-89.6350000',
+`fgActivo` tinyint(1) NOT NULL DEFAULT '0',
+PRIMARY KEY (`sess`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE `actores` (
+`id` bigint(20) NOT NULL AUTO_INCREMENT,
+`sess` varchar(32) DEFAULT NULL,
+`nombre` varchar(90) DEFAULT NULL,
+`color` varchar(7) DEFAULT NULL,
+`tipo` enum('auto','cliente') NOT NULL,
+`lat` decimal(10,7) NOT NULL,
+`lon` decimal(10,7) NOT NULL,
+`timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+`aceleracion` decimal(10,7) NOT NULL,
+`latRumbo` decimal(10,7) NOT NULL,
+`lonRumbo` decimal(10,7) NOT NULL,
+PRIMARY KEY (`id`),
+KEY `st` (`sess`,`tipo`)
+) ENGINE=MyISAM AUTO_INCREMENT=0 DEFAULT CHARSET=utf8;
+
+3. Ajustar los valores de conexión a la base de datos en:
+<directorio web>/config/database.php
+
+
+
+USO DE LA APLICACION
+====================
+
+- Usar Chrome!
+  Aunque es posible que funcione en otros navegadores, 
+  no se han realizado pruebas de compatibilidad.
+
+
+
+INSTANCIA DE PRUEBA
+===================
+
+http://pulpomatic.sefi.mx
+
+* Publicación en proceso, por confirmar.
