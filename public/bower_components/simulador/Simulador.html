@@ -1,0 +1,185 @@
+<dom-module id="mapa-simulador">
+   <style>
+      :host{ all: initial;
+             background: #eee;
+      };
+      #gmap{ height: 100%; };
+   </style>
+   <template>
+      <div id="gmap">
+      </div>
+      <nav class="form-inline">
+         <button  class="toggle glyphicon glyphicon-play btn btn-success active" 
+                  on-tap="toggle"
+                  ></button>
+         <spinner-box id="noAutos" icon="taxi" value="{{autos}}"></spinner-box>
+         <spinner-box id="noClientes" icon="male" value="{{clientes}}"></spinner-box>
+      </nav>
+   </template>
+   <script>
+      Polymer( { is: 'mapa-simulador'
+               , properties:  { lat: Number
+                              , lon: Number
+                              , clientes: Number
+                              , autos: Number
+                              , sesion : String
+                              , timer: Object
+                              , mapa: Object
+                              , service: Object
+                              , markers: Array
+                              , renderers: Array
+                              , isRunning: Boolean
+                              , isRefreshing: Boolean
+                              }
+               , observers:   [ '_onClientesChanged(clientes)'
+                              , '_onAutosChanged(autos)'
+                              ]
+               , toggle:function(){
+                           console.log("toggle "+this.isRunning);
+                           var e = document.querySelector('.mapa-simulador.toggle');
+                           var clases = e.className;
+                           if(this.isRunning){
+                              this.isRunning = false;
+                              this.stop();                              
+                              clases = clases.replace(/(?:^|\s)glyphicon-pause(?!\S)/g, ' glyphicon-play');
+                              clases = clases.replace(/(?:^|\s)btn-success(?!\S)/g, ' btn-success active');
+                           }else{
+                              this.isRunning = true;
+                              this.play();
+                              clases = clases.replace(/(?:^|\s)glyphicon-play(?!\S)/g, ' glyphicon-pause');
+                              clases = clases.replace(/(?:^|\s)btn-success active(?!\S)/g, ' btn-success');
+                           }
+                           e.className = clases;
+                        }
+               , play:  function () {
+                           var self = this;
+                           this.timer = setInterval(  function(){
+                                                         self.refresh();
+                                                      }
+                                                   , 1000
+                                                   );
+                        }
+               , stop:  function () {
+                           clearInterval(this.timer);
+                        }
+               , ready: function () {
+                           console.log("iniciando en "+this.lat+","+this.lon);
+                           this.markers = [];
+                           this.renderers = [];
+                           this.mapa = new google.maps.Map( document.getElementById('gmap')
+                                                          , { center:   { lat: this.lat
+                                                                        , lng: this.lon
+                                                                        }
+                                                            , scrollwheel: false
+                                                            , zoom: 15
+                                                            }
+                                                          );
+                           this.service = new google.maps.DirectionsService();
+                           this.isRunning = false;
+                           this.isRefreshing = false;
+                           this.$.noAutos.value = this.autos;
+                           this.$.noClientes.value = this.clientes;
+                           //var elementoClientes = this.$.noClientes;
+                           //elementoClientes.addEventListener('someevent',this._onClientesChanged)
+                        }
+               , refresh:  function () {
+                              console.log("actualizando "+this.sesion+","+this.isRefreshing);
+                              console.log("  a:"+this.$.noAutos.value+" c:"+this.$.noClientes.value);
+                              if(this.isRefreshing)
+                                 return;
+                              
+                              this.isRefreshing = true;
+                              var taxi = '\uf1ba';
+                              var male = '\uf183';
+                              var self = this;
+                              $.get(  { url: 'api/simulacion/'+this.sesion
+                                      , success:   function(data, status, xhr){ 
+                                                      console.log('success!!'+self.sesion);
+                                                      
+                                                      //console.log(data);
+                                                      for(var i=0; i<self.markers.length; i++){
+                                                         self.markers[i].setMap(null);
+                                                      }
+                                                      self.markers = [];
+                                                      for(var i=0; i<self.renderers.length; i++){
+                                                         self.renderers[i].setMap(null);
+                                                      }
+                                                      self.renderers = [];
+                                                      for(var i in data){
+                                                         console.log(data[i]);
+                                                         var pos = new google.maps.LatLng(data[i].posicion.lat, data[i].posicion.lon);
+                                                         const marker = new google.maps.Marker({ position: pos
+                                                                                               , map: self.mapa
+                                                                                               , icon: ' '
+                                                                                               , label: { fontFamily: 'Fontawesome'
+                                                                                                        , text: (data[i].tipo == 'auto' ? taxi : male)
+                                                                                                        }
+                                                                                               }
+                                                                                              );
+                                                         self.markers.push(marker);
+                                                         /*var pos2 = new google.maps.LatLng(data[i].latRumbo, data[i].lonRumbo);
+                                                         var marker2 = new google.maps.Marker({ position: pos2
+                                                                                             , map: self.mapa
+                                                                                             , icon: ' '
+                                                                                             , label: { fontFamily: 'Fontawesome'
+                                                                                                      , text: (data[i].tipo == 'auto' ? taxi : male)
+                                                                                                      , color: 'red'
+                                                                                                      }
+                                                                                             }
+                                                                                            );
+                                                         self.markers.push(marker2);*/
+                                                         const tooltip = data[i].id.toString();
+                                                         marker.addListener( 'mouseover'
+                                                                           ,  function(){
+                                                                                 console.log('id '+tooltip);
+                                                                              }
+                                                                           );
+                                                         if(data[i].tipo == 'auto' && data[i].clienteCercano !== null ){
+                                                            var pos2 = new google.maps.LatLng( data[i].clienteCercano.posicion.lat
+                                                                                             , data[i].clienteCercano.posicion.lon
+                                                                                             );
+                                                            const renderer = new google.maps.DirectionsRenderer(  { suppressMarkers: true
+                                                                                                                  , preserveViewport: true
+                                                                                                                  , polylineOptions: {strokeColor:data[i].color}
+                                                                                                                  }
+                                                                                                               );
+                                                            renderer.setMap(self.mapa);
+                                                            self.renderers.push(renderer);
+                                                            self.service.route(  { origin: pos
+                                                                                 , destination: pos2
+                                                                                 , travelMode: google.maps.DirectionsTravelMode.WALKING
+                                                                                 }
+                                                                              ,  function (response, status) {
+                                                                                    if(status === google.maps.DirectionsStatus.OK)
+                                                                                       renderer.setDirections(response);
+                                                                                 }
+                                                                              );
+                                                         }
+                                                         self.isRefreshing = false;
+                                                      }
+                                                   }
+                                      }
+                                    );
+                           }
+               , _onAutosChanged:      function(newVal){
+                                          console.log('_onAutosChanged');
+                                          $.get(   { url: 'api/simulacion/'+this.sesion+'/autos/'+newVal 
+                                                   , success:  function(data, status, xhr){ 
+                                                                  console.log(':)');
+                                                               }
+                                                   } 
+                                               );
+                                       }
+               , _onClientesChanged:   function(newVal){
+                                          console.log('_onClientesChanged');
+                                          $.get(   { url: 'api/simulacion/'+this.sesion+'/clientes/'+newVal 
+                                                   , success:  function(data, status, xhr){ 
+                                                                  console.log(':)');
+                                                               }
+                                                   } 
+                                               );
+                                       }
+               }
+      );
+   </script>
+</dom-module>
